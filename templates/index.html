@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>LinkSnip — URL Shortener</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { --navy:#0d1b2a; --steel:#1f4e79; --accent:#2e75b6; --bg:#f4f6fa; --card:#fff; --border:#dde3ed; --text:#1e1e1e; --muted:#6b7280; --red:#b91c1c; --green:#1a7a4a; }
+    body { font-family:'Times New Roman',serif; background:var(--bg); color:var(--text); }
+    header { background:var(--navy); color:#fff; padding:1rem 2rem; display:flex; align-items:center; justify-content:space-between; }
+    header h1 { font-size:1.4rem; letter-spacing:2px; }
+    header span { font-size:0.85rem; color:#a8c4e0; }
+    .container { max-width:960px; margin:2rem auto; padding:0 1.5rem; }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:1.5rem; margin-bottom:1.5rem; }
+    h2 { font-size:1rem; color:var(--steel); text-transform:uppercase; letter-spacing:1px; margin-bottom:1rem; }
+    .form-row { display:flex; gap:0.8rem; flex-wrap:wrap; align-items:flex-end; }
+    .form-group { display:flex; flex-direction:column; gap:4px; flex:1; min-width:160px; }
+    label { font-size:0.75rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; }
+    input { padding:9px 11px; border:1px solid var(--border); border-radius:5px; font-size:0.9rem; font-family:inherit; }
+    .btn { padding:9px 20px; border:none; border-radius:5px; cursor:pointer; font-size:0.9rem; font-family:inherit; font-weight:600; }
+    .btn-primary { background:var(--steel); color:#fff; }
+    .btn-primary:hover { background:var(--navy); }
+    .btn-sm { padding:4px 10px; font-size:0.78rem; border-radius:4px; border:none; cursor:pointer; font-family:inherit; }
+    .btn-danger { background:var(--red); color:#fff; }
+    .btn-info { background:var(--accent); color:#fff; }
+    .flash { padding:10px 16px; border-radius:6px; margin-bottom:1rem; font-size:0.9rem; }
+    .flash.success { background:#dcfce7; color:var(--green); }
+    .flash.error   { background:#fee2e2; color:var(--red); }
+    .flash.info    { background:#dbeafe; color:var(--steel); }
+    table { width:100%; border-collapse:collapse; font-size:0.88rem; }
+    th { background:var(--navy); color:#fff; padding:10px 12px; text-align:left; }
+    td { padding:9px 12px; border-bottom:1px solid var(--border); vertical-align:middle; }
+    tr:hover td { background:#f0f4fb; }
+    .short-link { color:var(--accent); font-weight:bold; text-decoration:none; }
+    .short-link:hover { text-decoration:underline; }
+    .original { color:var(--muted); font-size:0.8rem; max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .badge-clicks { background:#dbeafe; color:var(--steel); padding:2px 8px; border-radius:10px; font-size:0.8rem; font-weight:600; }
+    .copy-btn { background:none; border:1px solid var(--border); padding:3px 8px; border-radius:4px; cursor:pointer; font-size:0.75rem; color:var(--muted); }
+    .copy-btn:hover { background:var(--bg); }
+    .rank { font-weight:700; color:var(--steel); width:32px; }
+    .top-original { color:var(--muted); font-size:0.78rem; max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>✂ LINKSNIP</h1>
+  <span>URL Shortener &amp; Analytics</span>
+</header>
+<div class="container">
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}
+      <div class="flash {{ cat }}">{{ msg }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <!-- Shorten Form -->
+  <div class="card">
+    <h2>Shorten a URL</h2>
+    <form method="POST" action="/shorten">
+      <div class="form-row">
+        <div class="form-group" style="flex:3">
+          <label>Long URL</label>
+          <input type="text" name="url" placeholder="https://example.com/very-long-url" required />
+        </div>
+        <div class="form-group">
+          <label>Title (optional)</label>
+          <input type="text" name="title" placeholder="My Link" />
+        </div>
+        <div class="form-group">
+          <label>Custom Code (letters, numbers, - _)</label>
+          <input type="text" name="custom" placeholder="my-link" maxlength="20" />
+        </div>
+        <div class="form-group" style="flex:0">
+          <label>&nbsp;</label>
+          <button type="submit" class="btn btn-primary">Shorten</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <!-- Top 5 Links -->
+  <div class="card">
+    <h2>🏆 Top 5 Links by Clicks</h2>
+    <table>
+      <thead>
+        <tr><th>#</th><th>Short Code</th><th>Title / Original</th><th>Clicks</th></tr>
+      </thead>
+      <tbody id="top-body">
+        <tr><td colspan="4" style="text-align:center;color:var(--muted);padding:1rem">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- All Links Table -->
+  <div class="card">
+    <h2>All Links</h2>
+    {% if links %}
+    <table>
+      <thead>
+        <tr><th>Short Link</th><th>Title / Original</th><th>Clicks</th><th>Created</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for link in links %}
+        <tr>
+          <td>
+            <a class="short-link" href="/{{ link.code }}" target="_blank">{{ base_url }}/{{ link.code }}</a>
+            <button class="copy-btn" onclick="navigator.clipboard.writeText('{{ base_url }}/{{ link.code }}');this.textContent='Copied!'">Copy</button>
+          </td>
+          <td>
+            <div style="font-weight:600">{{ link.title or link.code }}</div>
+            <div class="original">{{ link.original }}</div>
+          </td>
+          <td><span class="badge-clicks">{{ link.total_clicks }}</span></td>
+          <td style="color:var(--muted);font-size:0.8rem">{{ link.created_at[:10] }}</td>
+          <td style="display:flex;gap:6px">
+            <a href="/stats/{{ link.code }}" class="btn btn-sm btn-info">Stats</a>
+            <form method="POST" action="/delete/{{ link.id }}" onsubmit="return confirm('Delete this link?')">
+              <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p style="color:var(--muted);text-align:center;padding:1rem">No links yet. Shorten your first URL above!</p>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+// Load Top 5 rankings from /api/top
+fetch('/api/top')
+  .then(r => r.json())
+  .then(data => {
+    const tbody = document.getElementById('top-body');
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:1rem">No links yet.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.map((row, i) => `
+      <tr>
+        <td class="rank">${i + 1}</td>
+        <td><a class="short-link" href="/stats/${row.code}">${row.code}</a></td>
+        <td>
+          <div style="font-weight:600">${row.title || row.code}</div>
+          <div class="top-original">${row.original}</div>
+        </td>
+        <td><span class="badge-clicks">${row.clicks}</span></td>
+      </tr>
+    `).join('');
+  })
+  .catch(() => {
+    document.getElementById('top-body').innerHTML =
+      '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:1rem">Could not load rankings.</td></tr>';
+  });
+</script>
+</body>
+</html>

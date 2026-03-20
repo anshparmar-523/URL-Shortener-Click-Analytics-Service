@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Stats — {{ link.code }}</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+    :root { --navy:#0d1b2a; --steel:#1f4e79; --accent:#2e75b6; --bg:#f4f6fa; --card:#fff; --border:#dde3ed; --text:#1e1e1e; --muted:#6b7280; }
+    body { font-family:'Times New Roman',serif; background:var(--bg); color:var(--text); }
+    header { background:var(--navy); color:#fff; padding:1rem 2rem; }
+    header h1 { font-size:1.3rem; letter-spacing:2px; }
+    .container { max-width:800px; margin:2rem auto; padding:0 1.5rem; }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:1.5rem; margin-bottom:1.5rem; }
+    h2 { font-size:1rem; color:var(--steel); text-transform:uppercase; letter-spacing:1px; margin-bottom:1rem; }
+    .stat { font-size:2.5rem; font-weight:bold; color:var(--steel); }
+    a.back { color:var(--accent); text-decoration:none; font-size:0.9rem; display:inline-block; margin-bottom:1rem; }
+    .meta { font-size:0.85rem; color:var(--muted); margin-top:4px; }
+  </style>
+</head>
+<body>
+<header><h1>✂ LINKSNIP — Analytics</h1></header>
+<div class="container">
+  <a class="back" href="/">← Back to Dashboard</a>
+
+  <div class="card">
+    <h2>Link Details</h2>
+    <p><strong>Short URL:</strong> <a href="{{ base_url }}/{{ link.code }}" target="_blank">{{ base_url }}/{{ link.code }}</a></p>
+    <p class="meta"><strong>Original:</strong> {{ link.original }}</p>
+    <p class="meta"><strong>Title:</strong> {{ link.title or "—" }}</p>
+    <p class="meta"><strong>Created:</strong> {{ link.created_at[:10] }}</p>
+    <br/>
+    <div class="stat">{{ total }}</div>
+    <div class="meta">Total Clicks</div>
+  </div>
+
+  <div class="card">
+    <h2>Clicks — Last 14 Days</h2>
+    <canvas id="lineChart" height="120"></canvas>
+  </div>
+</div>
+
+<script>
+fetch('/api/clicks/{{ link.code }}')
+  .then(r => r.json())
+  .then(data => {
+    new Chart(document.getElementById('lineChart'), {
+      type: 'line',
+      data: {
+        labels: data.labels,
+        datasets: [{ label: 'Clicks', data: data.clicks,
+          borderColor: '#2e75b6', backgroundColor: 'rgba(46,117,182,0.1)',
+          tension: 0.4, fill: true, pointRadius: 4 }]
+      },
+      options: { responsive: true, plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+    });
+  });
+</script>
+</body>
+</html>
